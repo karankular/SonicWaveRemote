@@ -1,0 +1,30 @@
+# Build outputs
+app/build/
+build/
+*/build/
+app/release/
+*.apk
+*.aab
+*.ap_
+*.zip
+
+# Gradle
+.gradle/
+local.properties
+
+# Signing — never commit keystores or credentials
+keystore.properties
+*.jks
+*.jsk
+*.keystore
+
+# Kotlin
+.kotlin/
+
+# IDE
+.idea/
+*.iml
+captures/
+
+# Misc
+.DS_Store
