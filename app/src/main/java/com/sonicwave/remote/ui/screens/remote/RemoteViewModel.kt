@@ -119,17 +119,39 @@ class RemoteViewModel @Inject constructor(
                     _connectionState.value = ConnectionState.Connected
                 },
                 onState = { newState ->
-                    val oldQueueSize = _playbackState.value?.queueSize ?: -1
-                    _playbackState.value = newState
+                    applyState(newState)
                     _connectionState.value = ConnectionState.Connected
-                    if (newState.queueSize != oldQueueSize) {
-                        viewModelScope.launch { fetchQueue() }
-                    }
                 },
                 onDisconnect = {
                     _connectionState.value = ConnectionState.Reconnecting
                 }
             )
+        }
+    }
+
+    /**
+     * The ONE place a new state is adopted, from either source.
+     *
+     * Both the SSE stream and the 3-second poll deliver the same state, and both used to store it
+     * directly -- but only the SSE path also refreshed the queue list. So the poll would quietly
+     * record the new queue identity, and the SSE event that followed would compare against the
+     * value the poll had already written, conclude nothing had changed, and never fetch the list.
+     * The size shown was correct and the list underneath it was the previous one. Funnelling both
+     * through here is the fix: two writers of the same state with different side effects is what
+     * made it a race rather than a bug that always reproduced.
+     *
+     * The refresh is keyed on the queue's REVISION, not its size, so a reorder or a same-length
+     * replacement is caught too.
+     */
+    private fun applyState(newState: RemotePlaybackState) {
+        val previous = _playbackState.value
+        _playbackState.value = newState
+        val queueChanged = previous == null ||
+            newState.queueRevision != previous.queueRevision ||
+            // Fallback for a phone that sends no revision: the size is all there is to compare.
+            (newState.queueRevision == 0 && newState.queueSize != previous.queueSize)
+        if (queueChanged) {
+            viewModelScope.launch { fetchQueue() }
         }
     }
 
@@ -154,7 +176,7 @@ class RemoteViewModel @Inject constructor(
                             || state.repeatMode != cur.repeatMode
                             || state.positionTimestamp >= cur.positionTimestamp
                         ) {
-                            _playbackState.value = state
+                            applyState(state)
                         }
                     }
                 } catch (_: Exception) { /* server unreachable — SSE will handle reconnect */ }

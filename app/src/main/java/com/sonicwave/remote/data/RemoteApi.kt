@@ -299,9 +299,16 @@ class RemoteApi @Inject constructor() {
                 repeatMode = obj.getString("repeatMode"),
                 queueSize = obj.getInt("queueSize"),
                 queueIndex = obj.getInt("queueIndex"),
+                queueRevision = obj.get("queueRevision")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
                 isFavorite = obj.getBoolean("isFavorite"),
                 volume = obj.getInt("volume"),
-                volumeMax = obj.get("volumeMax")?.takeIf { !it.isJsonNull }?.asInt?.coerceAtLeast(1) ?: 1
+                volumeMax = obj.get("volumeMax")?.takeIf { !it.isJsonNull }?.asInt?.coerceAtLeast(1) ?: 1,
+                // Read defensively: a phone on an older build does not send these, and the whole
+                // state must still parse rather than the remote going blank over a missing field.
+                sampleRate = obj.get("sampleRate")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
+                codec = obj.get("codec")?.takeIf { !it.isJsonNull }?.asString ?: "",
+                bitrate = obj.get("bitrate")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
+                isLossless = obj.get("isLossless")?.takeIf { !it.isJsonNull }?.asBoolean ?: false,
             )
         } catch (e: Exception) {
             null

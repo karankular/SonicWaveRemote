@@ -306,6 +306,37 @@ private fun SongInfoSection(state: RemotePlaybackState?) {
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
+        // The source format, when the phone reports one. Shown smaller than the artist line
+        // because it is reference information rather than identity, and omitted entirely when
+        // unknown -- an older phone build sends nothing, and a blank line reads as a fault.
+        state?.formatSummary?.let { format ->
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                if (state.isLossless) {
+                    Text(
+                        text = "Lossless",
+                        color = TextPrimary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(TextSecondary.copy(alpha = 0.18f))
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                    )
+                }
+                Text(
+                    text = format,
+                    color = TextSecondary,
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
     }
 }
 

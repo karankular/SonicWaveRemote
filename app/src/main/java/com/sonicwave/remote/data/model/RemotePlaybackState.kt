@@ -21,10 +21,44 @@ data class RemotePlaybackState(
     val repeatMode: String,   // "off" | "all" | "one"
     val queueSize: Int,
     val queueIndex: Int,
+    /**
+     * Identity of the queue's content AND order on the phone.
+     *
+     * The size cannot stand in for this: a reorder, or a replacement with a list of the same
+     * length, leaves it unchanged while the list is completely different. Defaulted so a phone on
+     * an older build -- which sends no revision -- keeps parsing.
+     */
+    val queueRevision: Int = 0,
     val isFavorite: Boolean = false,
-    val volume: Int = 0,       // current STREAM_MUSIC index
-    val volumeMax: Int = 1     // STREAM_MUSIC max (>=1)
+    val volume: Int = 0,       // current level of whichever control moves the sound
+    val volumeMax: Int = 1,    // its maximum (>=1)
+    // Format of the SOURCE file. Defaulted so an older phone build, which does not send these,
+    // simply shows nothing rather than failing to parse the whole state.
+    val sampleRate: Int = 0,
+    val codec: String = "",
+    val bitrate: Int = 0,
+    val isLossless: Boolean = false,
 ) {
+
+    /**
+     * The one-line format summary, or null when the phone told us nothing useful.
+     *
+     * Built here so the screen has no formatting logic and cannot disagree with itself. Only the
+     * parts actually known are shown: a missing rate or codec is left out rather than printed as a
+     * zero, because an invented figure on a screen people use to check the format is worse than an
+     * absent one.
+     */
+    val formatSummary: String?
+        get() = listOfNotNull(
+            codec.takeIf { it.isNotBlank() },
+            sampleRate.takeIf { it > 0 }?.let { formatKhz(it) },
+            bitrate.takeIf { it > 0 }?.let { "$it kbps" },
+        ).joinToString(" · ").takeIf { it.isNotBlank() }
+
+    private fun formatKhz(hz: Int): String {
+        val khz = hz / 1000.0
+        return if (khz % 1.0 == 0.0) "${khz.toInt()} kHz" else String.format("%.1f kHz", khz)
+    }
     /** Current volume as a 0..1 fraction for the remote's slider. */
     val volumeFraction: Float
         get() = if (volumeMax > 0) volume.toFloat() / volumeMax else 0f
