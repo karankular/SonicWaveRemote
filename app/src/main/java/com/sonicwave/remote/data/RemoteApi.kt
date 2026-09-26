@@ -120,6 +120,13 @@ class RemoteApi @Inject constructor() {
     fun getFavorites(baseUrl: String): List<RemoteSong> = fetchSongList("$baseUrl/api/favorites")
 
     /**
+     * Fetches the Auto Play preview from /api/auto_play -- what the phone will continue into once
+     * the real queue above it ends. Same shape as every other song list, so it reuses
+     * [fetchSongList] rather than a parser of its own.
+     */
+    fun getAutoPlayQueue(baseUrl: String): List<RemoteSong> = fetchSongList("$baseUrl/api/auto_play")
+
+    /**
      * Fetches recently added songs from /api/recent.
      */
     fun getRecent(baseUrl: String): List<RemoteSong> = fetchSongList("$baseUrl/api/recent")
@@ -265,6 +272,22 @@ class RemoteApi @Inject constructor() {
     }
 
     /**
+     * Turns Auto Play on/off on the phone. A dedicated method (not [sendControl]) for the same
+     * reason [playList] is -- the command needs a raw boolean the shared JSON-building helper
+     * there has no slot for.
+     */
+    fun setAutoPlayEnabled(baseUrl: String, enabled: Boolean): Boolean {
+        return try {
+            val body = "{\"action\":\"set_auto_play_enabled\",\"enabled\":$enabled}"
+                .toRequestBody(jsonMediaType)
+            val request = Request.Builder().url("$baseUrl/api/control").post(body).build()
+            client.newCall(request).execute().use { it.isSuccessful }
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /**
      * Plays a whole list of library songs (replaces the queue), optionally shuffled.
      * Order of [ids] is preserved server-side.
      */
@@ -309,6 +332,8 @@ class RemoteApi @Inject constructor() {
                 codec = obj.get("codec")?.takeIf { !it.isJsonNull }?.asString ?: "",
                 bitrate = obj.get("bitrate")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
                 isLossless = obj.get("isLossless")?.takeIf { !it.isJsonNull }?.asBoolean ?: false,
+                autoPlayEnabled = obj.get("autoPlayEnabled")?.takeIf { !it.isJsonNull }?.asBoolean ?: false,
+                autoPlaySize = obj.get("autoPlaySize")?.takeIf { !it.isJsonNull }?.asInt ?: 0,
             )
         } catch (e: Exception) {
             null

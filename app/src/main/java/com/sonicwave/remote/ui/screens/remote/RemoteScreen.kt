@@ -5,6 +5,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -49,6 +50,7 @@ private val TextDim = Color(0xFF555555)
 fun NowPlayingTab(viewModel: RemoteViewModel) {
     val playbackState by viewModel.playbackState.collectAsStateWithLifecycle()
     val queue by viewModel.queue.collectAsStateWithLifecycle()
+    val autoPlayQueue by viewModel.autoPlayQueue.collectAsStateWithLifecycle()
     val connectionState by viewModel.connectionState.collectAsStateWithLifecycle()
     val currentPosition by viewModel.currentPosition.collectAsStateWithLifecycle()
 
@@ -203,8 +205,11 @@ fun NowPlayingTab(viewModel: RemoteViewModel) {
         QueueBottomSheet(
             queue = queue,
             currentIndex = playbackState?.queueIndex ?: 0,
+            autoPlayQueue = autoPlayQueue,
+            autoPlayEnabled = playbackState?.autoPlayEnabled ?: false,
             onDismiss = { showQueue = false },
-            onSongClick = { songId -> viewModel.playSong(songId) }
+            onSongClick = { songId -> viewModel.playSong(songId) },
+            onToggleAutoPlay = { viewModel.setAutoPlayEnabled(it) }
         )
     }
 }
@@ -523,7 +528,10 @@ private fun QueueBottomSheet(
     queue: List<RemoteSong>,
     currentIndex: Int,
     onDismiss: () -> Unit,
-    onSongClick: (Long) -> Unit
+    onSongClick: (Long) -> Unit,
+    autoPlayQueue: List<RemoteSong> = emptyList(),
+    autoPlayEnabled: Boolean = false,
+    onToggleAutoPlay: (Boolean) -> Unit = {}
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val listState = rememberLazyListState()
@@ -567,6 +575,53 @@ private fun QueueBottomSheet(
                         }
                     )
                 }
+
+                // Auto Play -- what plays once the queue above ends. Only shown when the phone
+                // actually has a non-empty continuation ready; the toggle itself only hides the
+                // PREVIEW rows below it, mirroring the phone app's own queue sheet exactly.
+                if (autoPlayQueue.isNotEmpty()) {
+                    item {
+                        HorizontalDivider(color = Surface2, modifier = Modifier.padding(top = 4.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                                Text(
+                                    text = "Auto Play",
+                                    color = TextPrimary,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = "Continue with the rest of your library once this queue ends",
+                                    color = TextSecondary,
+                                    fontSize = 12.sp
+                                )
+                            }
+                            Switch(
+                                checked = autoPlayEnabled,
+                                onCheckedChange = onToggleAutoPlay,
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = OnPrimary,
+                                    checkedTrackColor = Primary,
+                                    uncheckedTrackColor = Surface2
+                                )
+                            )
+                        }
+                    }
+                    // Read-only preview: these songs aren't in the real queue yet, so tapping one
+                    // shouldn't act like a real queue row (no onClick, no current-song highlight).
+                    if (autoPlayEnabled) {
+                        items(autoPlayQueue) { song ->
+                            QueueSongRow(song = song, isCurrentSong = false, onClick = {})
+                        }
+                    }
+                }
+
                 item { Spacer(modifier = Modifier.navigationBarsPadding()) }
             }
         }

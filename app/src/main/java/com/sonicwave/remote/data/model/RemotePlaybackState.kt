@@ -38,6 +38,14 @@ data class RemotePlaybackState(
     val codec: String = "",
     val bitrate: Int = 0,
     val isLossless: Boolean = false,
+    /**
+     * Auto Play: whether the phone will continue into the rest of its library once the queue
+     * above ends, and how many songs are in that continuation right now. Defaulted so an older
+     * phone build (which sends neither field) just never shows the section, same as every other
+     * field a newer client can't assume yet.
+     */
+    val autoPlayEnabled: Boolean = false,
+    val autoPlaySize: Int = 0,
 ) {
 
     /**

@@ -29,6 +29,10 @@ class RemoteViewModel @Inject constructor(
     private val _queue = MutableStateFlow<List<RemoteSong>>(emptyList())
     val queue: StateFlow<List<RemoteSong>> = _queue
 
+    /** Auto Play's preview -- what plays once [queue] ends. See [RemotePlaybackState.autoPlaySize]. */
+    private val _autoPlayQueue = MutableStateFlow<List<RemoteSong>>(emptyList())
+    val autoPlayQueue: StateFlow<List<RemoteSong>> = _autoPlayQueue
+
     private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Connecting)
     val connectionState: StateFlow<ConnectionState> = _connectionState
 
@@ -103,6 +107,7 @@ class RemoteViewModel @Inject constructor(
                     _playbackState.value = state
                     _connectionState.value = ConnectionState.Connected
                     fetchQueue()
+                    fetchAutoPlayQueue()
                 }
                 // If null (idle), still proceed to SSE — onConnected will set Connected
             } catch (_: Exception) {
@@ -153,6 +158,15 @@ class RemoteViewModel @Inject constructor(
         if (queueChanged) {
             viewModelScope.launch { fetchQueue() }
         }
+        // Auto Play's preview carries no revision of its own (see the phone app's RemoteState.
+        // autoPlaySize KDoc) -- size is genuinely all there is here, same fallback the queue above
+        // uses for an older phone. A same-size reshuffle of the preview is missed, same tradeoff.
+        val autoPlayChanged = previous == null ||
+            newState.autoPlayEnabled != previous.autoPlayEnabled ||
+            newState.autoPlaySize != previous.autoPlaySize
+        if (autoPlayChanged) {
+            viewModelScope.launch { fetchAutoPlayQueue() }
+        }
     }
 
     private fun startPolling() {
@@ -189,6 +203,11 @@ class RemoteViewModel @Inject constructor(
         _queue.value = q
     }
 
+    private suspend fun fetchAutoPlayQueue() {
+        val q = withContext(Dispatchers.IO) { remoteApi.getAutoPlayQueue(baseUrl) }
+        _autoPlayQueue.value = q
+    }
+
     // ── Control commands ──────────────────────────────────────────────────
 
     fun playPause() = sendControl("play_pause")
@@ -221,6 +240,14 @@ class RemoteViewModel @Inject constructor(
         _playbackState.value?.let { st -> _playbackState.value = st.copy(isFavorite = !st.isFavorite) }
         viewModelScope.launch(Dispatchers.IO) {
             remoteApi.sendControl(baseUrl, "toggle_favorite")
+        }
+    }
+
+    /** Turn Auto Play on/off (optimistic local flip, same pattern as [toggleFavorite]). */
+    fun setAutoPlayEnabled(enabled: Boolean) {
+        _playbackState.value?.let { st -> _playbackState.value = st.copy(autoPlayEnabled = enabled) }
+        viewModelScope.launch(Dispatchers.IO) {
+            remoteApi.setAutoPlayEnabled(baseUrl, enabled)
         }
     }
 
